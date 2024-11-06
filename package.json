@@ -7,5 +7,10 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "@distube/ytdl-core": "^4.15.1",
+    "cors": "^2.8.5",
+    "express": "^4.21.1"
+  }
 }
