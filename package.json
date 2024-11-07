@@ -2,9 +2,11 @@
   "name": "youtube-downloader-backend",
   "version": "1.0.0",
   "description": "a youtube video downloader project",
+  "type": "module",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon src/index.js"
   },
   "author": "",
   "license": "ISC",
@@ -12,5 +14,8 @@
     "@distube/ytdl-core": "^4.15.1",
     "cors": "^2.8.5",
     "express": "^4.21.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.7"
   }
 }
