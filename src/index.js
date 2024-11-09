@@ -6,20 +6,25 @@ const app = express();
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({extended: true})); //only looks at url encoded requests
+app.use((req, res, next) => {
+    res.setHeader('Content-Type', 'application/json');
+    next();
+});
 
-const PORT = process.env.PORT || 3000;
+const PORT = 3000;
 
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`)
 })
 
-app.get("/", async(req, res) => {
+app.get("/healthcheck", async(req, res) => {
     res.send("Working fine..");
 })
 
 app.post("/api/video-info", async(req, res) => {
-    const { url }  = req.body;
-
+    const {url}  = req.body;
+    console.log("url request: ",url)
     if(!ytdl.validateURL(url)) {
         return res
         .status(400)
@@ -30,7 +35,7 @@ app.post("/api/video-info", async(req, res) => {
         const info = await ytdl.getInfo(url);
         const videoDetails = {
             title: info.videoDetails.title,
-            thumbnail: info.videoDetails.thumbnail,
+            thumbnail: info.videoDetails.thumbnails,
             formats: info.formats
             .filter(format => format.hasAudio && format.hasVideo) 
             .map(format => ({
