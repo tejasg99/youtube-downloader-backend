@@ -36,13 +36,7 @@ app.post("/api/video-info", async(req, res) => {
         const videoDetails = {
             title: info.videoDetails.title,
             thumbnail: info.videoDetails.thumbnails,
-            formats: info.formats
-            .filter(format => format.hasAudio && format.hasVideo) 
-            .map(format => ({
-                quality: format.qualityLabel,
-                type: format.container,
-                url: format.url,
-            }))
+            formats: info.formats,
         };
         res.json(videoDetails);
     } catch (error) {
@@ -52,3 +46,13 @@ app.post("/api/video-info", async(req, res) => {
         .json({ error: "Failed to fetch video information"})
     }
 });
+
+/*
+            formats: info.formats
+            .filter(format => format.hasAudio && format.hasVideo) 
+            .map(format => ({
+                quality: format.qualityLabel,
+                type: format.container,
+                url: format.url,
+            }))
+*/
