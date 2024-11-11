@@ -35,8 +35,24 @@ app.post("/api/video-info", async(req, res) => {
         const info = await ytdl.getInfo(url);
         const videoDetails = {
             title: info.videoDetails.title,
-            thumbnail: info.videoDetails.thumbnails,
-            formats: info.formats,
+            thumbnail: info.videoDetails.thumbnails[1],
+            videoFormats: info.formats
+            .filter(format => format.hasVideo)
+            .map(format => ({
+                quality: format.qualityLabel,
+                mimeType: format.mimeType,
+                type: format.container,
+                url: format.url,
+            })),
+            audioFormats: info.formats
+            .filter(format => format.hasAudio)
+            .map(format => ({
+                quality: format.audioQuality,
+                bitrate: format.audioBitrate,
+                type: format.container,
+                codec: format.codecs,
+                url: format.url,
+            })),
         };
         res.json(videoDetails);
     } catch (error) {
@@ -46,13 +62,3 @@ app.post("/api/video-info", async(req, res) => {
         .json({ error: "Failed to fetch video information"})
     }
 });
-
-/*
-            formats: info.formats
-            .filter(format => format.hasAudio && format.hasVideo) 
-            .map(format => ({
-                quality: format.qualityLabel,
-                type: format.container,
-                url: format.url,
-            }))
-*/
