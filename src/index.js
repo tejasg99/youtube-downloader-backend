@@ -45,6 +45,7 @@ app.post("/api/video-info", async(req, res) => {
                 quality: format.qualityLabel,
                 mimeType: format.mimeType,
                 type: format.container,
+                itag: format.itag, //since it is unique
                 url: format.url,
             })),
             audioFormats: info.formats
@@ -54,6 +55,7 @@ app.post("/api/video-info", async(req, res) => {
                 bitrate: format.audioBitrate,
                 type: format.container,
                 codec: format.codecs,
+                itag: format.itag,
                 url: format.url,
             })),
         };
@@ -67,7 +69,7 @@ app.post("/api/video-info", async(req, res) => {
 });
 
 app.get("/api/download", async(req, res) => {
-    const {url, videoFormat, audioFormat} = req.query;
+    const {url, videoFormatTag, audioFormatTag} = req.query;
 
     if(!ytdl.validateURL(url)) {
         return res
@@ -83,8 +85,8 @@ app.get("/api/download", async(req, res) => {
         const outputPath = path.join(__dirname, 'output_video.mp4');
 
         // Download video and audio streams
-        const videoStream = ytdl(url, { quality: videoFormat });
-        const audioStream = ytdl(url, { quality: audioFormat });
+        const videoStream = ytdl(url, { itag: videoFormatTag });
+        const audioStream = ytdl(url, { itag: audioFormatTag });
 
         // Save video and audio to temporary files
         videoStream.pipe(fs.createWriteStream(videoPath));
