@@ -66,6 +66,7 @@ app.post("/api/video-info", async (req, res) => {
 
 app.get("/api/download", async (req, res) => {
   const { url, videoFormatTag, audioFormatTag } = req.query;
+  console.log("Download called, query object: ", req.query)
 
   if (!ytdl.validateURL(url)) {
     return res.status(400).json({ error: "Invalid url" });
@@ -78,9 +79,24 @@ app.get("/api/download", async (req, res) => {
     const audioPath = path.join(__dirname, "temp_audio.mp4");
     const outputPath = path.join(__dirname, "output_video.mp4");
 
+    const info = await ytdl.getInfo(url);
+
+    // Confirm the selected tags correspond to the correct stream types
+    const videoFormat = info.formats.find(f => f.itag === parseInt(videoFormatTag) && f.hasVideo && !f.hasAudio);
+    const audioFormat = info.formats.find(f => f.itag === parseInt(audioFormatTag) && f.hasAudio && !f.hasVideo);
+
+    console.log("videoFormat ", videoFormat, `\n audioFormat `, audioFormat);
+    if (!videoFormat) {
+        return res.status(400).json({ error: "Invalid video format tag selected." });
+    }
+
+    if (!audioFormat) {
+        return res.status(400).json({ error: "Invalid audio format tag selected." });
+    }
+
     // Download video and audio streams
-    const videoStream = ytdl(url, { itag: videoFormatTag });
-    const audioStream = ytdl(url, { itag: audioFormatTag });
+    const videoStream = ytdl.downloadFromInfo(info, { quality: videoFormat.itag });
+    const audioStream = ytdl.downloadFromInfo(info, { quality: audioFormat.itag });
 
     // Save video and audio to temporary files
     const videoFile = fs.createWriteStream(videoPath);
@@ -91,7 +107,9 @@ app.get("/api/download", async (req, res) => {
 
     // Finish listener on videoFile stream to ensure that entire file is written before merge starts
     videoFile.on("finish", () => {
+      console.log("VideoFile finished")
       audioFile.on("finish", () => {
+        console.log("AudioFile finished")
         ffmpeg()
           .input(videoPath)
           .input(audioPath)
