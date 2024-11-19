@@ -56,6 +56,7 @@ app.post("/api/video-info", async (req, res) => {
           itag: format.itag,
           url: format.url,
         })),
+      originalUrl: url,
     };
     res.json(videoDetails);
   } catch (error) {
