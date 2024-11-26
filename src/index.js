@@ -2,24 +2,27 @@ import express from "express";
 import cors from "cors";
 import ytdl from "@distube/ytdl-core";
 import ffmpeg from "fluent-ffmpeg";
-import fs from "fs";
 import path from "path";
+import fs from "fs";
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); //only looks at url encoded requests
-app.use((req, res, next) => {
-  res.setHeader("Content-Type", "application/json");
-  next();
-});
+// app.use((req, res, next) => {
+//   res.setHeader("Content-Type", "application/json");
+//   next();
+// });
 
 const PORT = 3000;
 
 app.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
+
+// Since __dirname is not supported in module syntax
+const __dirname = path.resolve();
 
 app.get("/healthcheck", async (req, res) => {
   res.send("Working fine..");
@@ -67,70 +70,78 @@ app.post("/api/video-info", async (req, res) => {
 
 app.get("/api/download", async (req, res) => {
   const { url, videoFormatTag, audioFormatTag } = req.query;
-  console.log("Download called, query object: ", req.query)
 
   if (!ytdl.validateURL(url)) {
-    return res.status(400).json({ error: "Invalid url" });
+    return res.status(400).json({ error: "Invalid URL" });
   }
 
   try {
-    // temporary file paths
-    const __dirname = path.resolve();
-    const videoPath = path.join(__dirname, "temp_video.mp4");
-    const audioPath = path.join(__dirname, "temp_audio.mp4");
-    const outputPath = path.join(__dirname, "output_video.mp4");
-
     const info = await ytdl.getInfo(url);
 
-    // Confirm the selected tags correspond to the correct stream types
-    const videoFormat = info.formats.find(f => f.itag === parseInt(videoFormatTag) && f.hasVideo && !f.hasAudio);
-    const audioFormat = info.formats.find(f => f.itag === parseInt(audioFormatTag) && f.hasAudio && !f.hasVideo);
+    const videoFormat = info.formats.find(
+      (f) => f.itag === parseInt(videoFormatTag) && f.hasVideo && !f.hasAudio
+    );
 
-    console.log("videoFormat ", videoFormat, `\n audioFormat `, audioFormat);
-    if (!videoFormat) {
-        return res.status(400).json({ error: "Invalid video format tag selected." });
+    const audioFormat = info.formats.find(
+      (f) => f.itag === parseInt(audioFormatTag) && f.hasAudio && !f.hasVideo
+    );
+
+    if (!videoFormat || !audioFormat) {
+      return res.status(400).json({ error: "Invalid format tags selected." });
     }
 
-    if (!audioFormat) {
-        return res.status(400).json({ error: "Invalid audio format tag selected." });
-    }
+    const videoTempPath = path.join(__dirname, `video_${Date.now()}.mp4`);
+    const audioTempPath = path.join(__dirname, `audio_${Date.now()}.mp3`);
 
-    // Download video and audio streams
-    const videoStream = ytdl.downloadFromInfo(info, { quality: videoFormat.itag });
-    const audioStream = ytdl.downloadFromInfo(info, { quality: audioFormat.itag });
+    // Download video and audio to temporary files
+    console.log("Downloading video...");
+    const videoStream = ytdl(url, { quality: videoFormat.itag }).pipe(
+      fs.createWriteStream(videoTempPath)
+    );
 
-    // Save video and audio to temporary files
-    const videoFile = fs.createWriteStream(videoPath);
-    const audioFile = fs.createWriteStream(audioPath);
+    console.log("Downloading audio...");
+    const audioStream = ytdl(url, { quality: audioFormat.itag }).pipe(
+      fs.createWriteStream(audioTempPath)
+    );
 
-    videoStream.pipe(videoFile);
-    audioStream.pipe(audioFile);
+    await Promise.all([
+      new Promise((resolve) => videoStream.on("finish", resolve)),
+      new Promise((resolve) => audioStream.on("finish", resolve)),
+    ]);
 
-    // Finish listener on videoFile stream to ensure that entire file is written before merge starts
-    videoFile.on("finish", () => {
-      console.log("VideoFile finished")
-      audioFile.on("finish", () => {
-        console.log("AudioFile finished")
-        ffmpeg()
-          .input(videoPath)
-          .input(audioPath)
-          .output(outputPath)
-          .on("end", () => {
-            res.download(outputPath, "video_with_audio.mp4", (err) => {
-              if (err) console.error("Error during download: ", err);
+    console.log("Merging video and audio...");
+    const outputFileName = `merged_${Date.now()}.mp4`;
+    const outputFilePath = path.join(__dirname, outputFileName);
 
-              fs.unlinkSync(videoPath);
-              fs.unlinkSync(audioPath);
-              fs.unlinkSync(outputPath);
-            });
-          })
-          .on("error", (err) => {
-            console.error("Error during merging", err);
-            res.status(500).json({ error: "Failed to merge video and audio" });
-          })
-          .run();
+    ffmpeg()
+      .input(videoTempPath)
+      .input(audioTempPath)
+      .outputOptions("-c:v copy") // Copy video stream without re-encoding
+      .outputOptions("-c:a aac") // Ensure audio is in a compatible format
+      .save(outputFilePath)
+      .on("end", () => {
+        console.log("Merging completed successfully");
+        // Send the file to the client
+        res.download(outputFilePath, "video_with_audio.mp4", (err) => {
+          if (err) {
+            console.error("Error sending file:", err);
+            res.status(500).json({ error: "Failed to send file" });
+          }
+
+          // Clean up temporary files
+          fs.unlinkSync(videoTempPath);
+          fs.unlinkSync(audioTempPath);
+          fs.unlinkSync(outputFilePath);
+        });
+      })
+      .on("error", (err) => {
+        console.error("Error during merging:", err.message);
+        res.status(500).json({ error: "Failed to merge video and audio" });
+
+        // Clean up temporary files
+        fs.unlinkSync(videoTempPath);
+        fs.unlinkSync(audioTempPath);
       });
-    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ error: "Failed to download and merge files" });
