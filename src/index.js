@@ -24,6 +24,13 @@ app.listen(PORT, () => {
 // Since __dirname is not supported in module syntax
 const __dirname = path.resolve();
 
+const TEMP_DIR = path.join(__dirname, "TEMP");
+
+// Ensure the TEMP directory exists
+if (!fs.existsSync(TEMP_DIR)) {
+  fs.mkdirSync(TEMP_DIR);
+}
+
 app.get("/healthcheck", async (req, res) => {
   res.send("Working fine..");
 });
@@ -90,8 +97,8 @@ app.get("/api/download", async (req, res) => {
       return res.status(400).json({ error: "Invalid format tags selected." });
     }
 
-    const videoTempPath = path.join(__dirname, `video_${Date.now()}.mp4`);
-    const audioTempPath = path.join(__dirname, `audio_${Date.now()}.mp3`);
+    const videoTempPath = path.join(TEMP_DIR, `video_${Date.now()}.mp4`);
+    const audioTempPath = path.join(TEMP_DIR, `audio_${Date.now()}.mp3`);
 
     // Download video and audio to temporary files
     console.log("Downloading video...");
