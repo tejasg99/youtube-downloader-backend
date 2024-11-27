@@ -7,7 +7,11 @@ import fs from "fs";
 
 const app = express();
 
-app.use(cors());
+app.use(cors(
+  {
+    exposedHeaders: ["Content-Disposition"], //allow client to access this header
+  }
+));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); //only looks at url encoded requests
 // app.use((req, res, next) => {
@@ -85,6 +89,12 @@ app.get("/api/download", async (req, res) => {
   try {
     const info = await ytdl.getInfo(url);
 
+    const title = info.videoDetails.title;
+
+    const sanitizeTitle = (title) => {
+      return title.replace(/[^a-zA-Z0-9-_ ]/g, "").trim();
+    };
+
     const videoFormat = info.formats.find(
       (f) => f.itag === parseInt(videoFormatTag) && f.hasVideo && !f.hasAudio
     );
@@ -118,7 +128,7 @@ app.get("/api/download", async (req, res) => {
 
     console.log("Merging video and audio...");
     const outputFileName = `merged_${Date.now()}.mp4`;
-    const outputFilePath = path.join(__dirname, outputFileName);
+    const outputFilePath = path.join(TEMP_DIR, outputFileName);
 
     ffmpeg()
       .input(videoTempPath)
@@ -128,8 +138,17 @@ app.get("/api/download", async (req, res) => {
       .save(outputFilePath)
       .on("end", () => {
         console.log("Merging completed successfully");
+        const sanitizedTitle = sanitizeTitle(title);
+
+        // Manually setting the content-disposition header
+        res.setHeader(
+          "Content-Disposition",
+          `attachment; filename="${sanitizedTitle}.mp4"`
+        );
+        res.setHeader("Content-Type", "video/mp4");
+
         // Send the file to the client
-        res.download(outputFilePath, "video_with_audio.mp4", (err) => {
+        res.download(outputFilePath, `${sanitizedTitle}.mp4`, (err) => {
           if (err) {
             console.error("Error sending file:", err);
             res.status(500).json({ error: "Failed to send file" });
