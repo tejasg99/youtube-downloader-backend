@@ -14,10 +14,6 @@ app.use(cors(
 ));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); //only looks at url encoded requests
-// app.use((req, res, next) => {
-//   res.setHeader("Content-Type", "application/json");
-//   next();
-// });
 
 const PORT = 3000;
 
@@ -27,7 +23,6 @@ app.listen(PORT, () => {
 
 // Since __dirname is not supported in module syntax
 const __dirname = path.resolve();
-
 const TEMP_DIR = path.join(__dirname, "TEMP");
 
 // Ensure the TEMP directory exists
@@ -55,7 +50,6 @@ app.post("/api/video-info", async (req, res) => {
         .filter((format) => format.hasVideo)
         .map((format) => ({
           quality: format.qualityLabel,
-          mimeType: format.mimeType,
           type: format.container,
           itag: format.itag, //since it is unique
           url: format.url,
@@ -66,7 +60,6 @@ app.post("/api/video-info", async (req, res) => {
           quality: format.audioQuality,
           bitrate: format.audioBitrate,
           type: format.container,
-          codec: format.codecs,
           itag: format.itag,
           url: format.url,
         })),
