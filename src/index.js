@@ -72,6 +72,31 @@ app.post("/api/video-info", async (req, res) => {
   }
 });
 
+// Server sent events to send updates
+const clients = [];
+
+app.get("/api/download-status", (req, res) => {
+  // SSE headers
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+
+  // Add to the list of clients
+  clients.push(res);
+
+  // remove client on connection close
+  req.on("close", () => {
+    clients.splice(clients.indexOf(res), 1);
+  });
+})
+
+// function to send updates
+const sendUpdate = (message) => {
+  clients.forEach((client) => {
+    client.write(`data: ${JSON.stringify({ message })}\n\n`)
+  })
+}
+
 app.get("/api/download", async (req, res) => {
   const { url, videoFormatTag, audioFormatTag } = req.query;
 
@@ -105,11 +130,13 @@ app.get("/api/download", async (req, res) => {
 
     // Download video and audio to temporary files
     console.log("Downloading video...");
+    sendUpdate("Downloading video...");
     const videoStream = ytdl(url, { quality: videoFormat.itag }).pipe(
       fs.createWriteStream(videoTempPath)
     );
 
     console.log("Downloading audio...");
+    sendUpdate("Downloading audio...");
     const audioStream = ytdl(url, { quality: audioFormat.itag }).pipe(
       fs.createWriteStream(audioTempPath)
     );
@@ -120,6 +147,7 @@ app.get("/api/download", async (req, res) => {
     ]);
 
     console.log("Merging video and audio...");
+    sendUpdate("Merging video and audio...");
     const outputFileName = `merged_${Date.now()}.mp4`;
     const outputFilePath = path.join(TEMP_DIR, outputFileName);
 
@@ -131,6 +159,7 @@ app.get("/api/download", async (req, res) => {
       .save(outputFilePath)
       .on("end", () => {
         console.log("Merging completed successfully");
+        sendUpdate("Merging completed successfully");
         const sanitizedTitle = sanitizeTitle(title);
 
         // Manually setting the content-disposition header
